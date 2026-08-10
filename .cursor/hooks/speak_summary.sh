@@ -36,7 +36,12 @@ log() {
   echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") $*" >>"${LOG}"
 }
 
-HOOK_STDIN="$(mktemp "${STATE_DIR}/hook_stdin.XXXXXX.json")"
+# Clear out any leftover temp file a prior run left behind (e.g. killed by the
+# hook timeout before reaching its own cleanup) so it can never block mktemp.
+find "${STATE_DIR}" -maxdepth 1 -name 'hook_stdin.*' -mmin +10 -delete 2>/dev/null || true
+
+HOOK_STDIN="$(mktemp "${STATE_DIR}/hook_stdin.XXXXXX")"
+trap 'rm -f "${HOOK_STDIN}"' EXIT
 cat >"${HOOK_STDIN}" || true
 HOOK_BYTES="$(wc -c <"${HOOK_STDIN}" | tr -d ' \n\r')"
 log "hook_invoked hook_json_bytes=${HOOK_BYTES}"
