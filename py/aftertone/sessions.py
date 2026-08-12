@@ -51,6 +51,12 @@ def hook_adapter(hook: dict) -> Adapter:
     if event == "afterAgentResponse":
         return "cursor"
     if event in ("Stop", "SubagentStop"):
+        # Claude Code's own Stop/SubagentStop payload always carries this key
+        # (required bool per its hook schema) and also carries permission_mode,
+        # which _looks_like_codex_hook() treats as a Codex signal. Check the
+        # Claude-specific key first so real Claude Code hooks aren't misread.
+        if "stop_hook_active" in hook:
+            return "claude"
         if _looks_like_codex_hook(hook):
             return "codex"
         return "claude"

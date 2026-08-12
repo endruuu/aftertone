@@ -39,10 +39,17 @@ def assistant_text_blocks(lines: list[str]) -> str:
             continue
 
         text = ""
-        if obj.get("role") == "assistant":
+        msg = obj.get("message")
+        # Claude Code's own transcript lines nest role under message.role
+        # (top-level is type: "assistant"), rather than a top-level role key.
+        is_assistant = obj.get("role") == "assistant" or (
+            obj.get("type") == "assistant"
+            and isinstance(msg, dict)
+            and msg.get("role") == "assistant"
+        )
+        if is_assistant:
             text = _content_text(obj.get("content"))
             if not text:
-                msg = obj.get("message")
                 if isinstance(msg, str):
                     text = msg.strip()
                 elif isinstance(msg, dict):
