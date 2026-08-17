@@ -195,6 +195,63 @@ def test_resolve_raw_text_reads_codex_transcript_message_shape(tmp_path: Path):
     assert "Later commentary" not in raw
 
 
+def test_resolve_raw_text_does_not_resurrect_old_tag_from_earlier_turn(tmp_path: Path):
+    from aftertone.extract import resolve_raw_text
+
+    transcript = tmp_path / "claude.jsonl"
+    transcript.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        "Restarted the daemon.\n\n"
+                                        "<spoken_summary>"
+                                        "Old turn from days ago spoke!!"
+                                        "</spoken_summary>"
+                                    ),
+                                }
+                            ],
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Here is the investigation writeup, no tag this time.",
+                                }
+                            ],
+                        },
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    hook = {
+        "hook_event_name": "Stop",
+        "session_id": "claude-long-lived-session",
+        "last_assistant_message": "Here is the investigation writeup, no tag this time.",
+        "transcript_path": str(transcript),
+    }
+
+    raw = resolve_raw_text(hook, "Stop")
+
+    assert "Old turn from days ago" not in raw
+
+
 def test_session_allowlist_blocks_unlisted(tmp_path):
     from aftertone.sessions import save_sessions
 

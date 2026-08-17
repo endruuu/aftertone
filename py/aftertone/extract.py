@@ -39,6 +39,7 @@ def assistant_text_blocks(lines: list[str]) -> str:
             continue
 
         text = ""
+        is_primary_reply = False
         msg = obj.get("message")
         # Claude Code's own transcript lines nest role under message.role
         # (top-level is type: "assistant"), rather than a top-level role key.
@@ -54,20 +55,31 @@ def assistant_text_blocks(lines: list[str]) -> str:
                     text = msg.strip()
                 elif isinstance(msg, dict):
                     text = _content_text(msg.get("content"))
+            is_primary_reply = bool(text)
         payload = obj.get("payload")
         if not text and isinstance(payload, dict):
             if payload.get("type") == "agent_message":
+                # A trailing side-channel note (e.g. Codex commentary after its
+                # real reply), not a new turn — never lets an older tagged
+                # reply expire.
                 msg = payload.get("message")
                 if isinstance(msg, str):
                     text = msg.strip()
             elif payload.get("type") == "message" and payload.get("role") == "assistant":
                 text = _content_text(payload.get("content"))
+                is_primary_reply = bool(text)
 
         if not text:
             continue
         last_text = text
         if parse_spoken_summary(text)[0]:
             last_spoken_text = text
+        elif is_primary_reply:
+            # A newer, untagged reply is a real subsequent turn — it
+            # supersedes any tag left over from an earlier turn, so a
+            # long-lived session doesn't keep re-speaking an old tag once
+            # the latest reply has moved on without one.
+            last_spoken_text = ""
 
     return last_spoken_text or last_text
 
